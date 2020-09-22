@@ -1,3 +1,48 @@
+
+/***
+TODO:
+  multisampling support
+    needs to create a intermediate texture, that then is resolved to the ultimate attachment
+  colorformat for surface
+  clearcolor per attachment
+  attachment load/store config?
+  simple configuration thing. Maybe just set_resolution which dirties/invalidates the state
+  begin_render_pass with some config, perhaps the load/store, or not. Which attachment is bound.
+  depth only pass?
+
+  some getters.. num_attachments(), get_attachment_format(idx) ?
+
+
+  or maybe everything is setup with one big descriptor always..
+
+  does multisampling have to be the same on all attachments?
+
+  FramebufferDescriptor {
+      attachments: &[
+          FramebufferAttachment::Surface::from_window(win),
+          FramebufferAttachment::Texture {
+              format: fmt,
+              clear_color: &[0,0,0,0],
+              load_store: ... ??
+          },
+       ],
+      depth_stencil: FramebufferDepthStencil {
+          format: depth_format,
+          depth_clear: 0,
+          depth_store: false,
+          stencil_clear: 0,
+          stencil_store: false
+      },
+      multisample: Some(4),
+      resolution: (256,256)
+  }
+
+***/
+
+
+
+
+
 #[derive(Debug)]
 enum FramebufferAttachment {
     Surface {
@@ -193,14 +238,14 @@ impl Framebuffer {
         }
     }
 
-    pub fn color_format(&self) -> Option<wgpu::TextureFormat> {
-        // TODO:
-        Some(wgpu::TextureFormat::Bgra8UnormSrgb)
-        // Some(wgpu::TextureFormat::Bgra8Unorm)
-    }
-    pub fn sample_count(&self) -> u32 {
-        1 // TODO:
-    }
+    // pub fn color_format(&self) -> Option<wgpu::TextureFormat> {
+    //     // TODO:
+    //     Some(wgpu::TextureFormat::Bgra8UnormSrgb)
+    //     // Some(wgpu::TextureFormat::Bgra8Unorm)
+    // }
+    // pub fn sample_count(&self) -> u32 {
+    //     1 // TODO:
+    // }
 
     pub fn begin_render_pass<'a>(
         &'a mut self,
