@@ -3,20 +3,16 @@ use wgpu;
 use wgpu_util;
 
 async fn app() {
-    let instance = wgpu::Instance::new();
-    let _adapter = instance
-        .request_adapter(
-            &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::Default,
-                compatible_surface: None, //Some(&surface),
-            },
-            wgpu::BackendBit::PRIMARY,
-        )
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::Default,
+            compatible_surface: None, //Some(&surface),
+        })
         .await
         .unwrap();
 
-    // unimplemented!() in master
-    // println!("Adapter: {}", adapter.get_info().name);
+    println!("Adapter: {}", adapter.get_info().name);
 }
 
 fn main() {
