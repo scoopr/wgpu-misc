@@ -23,25 +23,21 @@ fn frame(device: &wgpu::Device, framebuffer: &mut wgpu_util::Framebuffer) -> wgp
 }
 
 async fn app() {
-    let instance = wgpu::Instance::new();
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
     let adapter = instance
-        .request_adapter(
-            &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::Default,
-                compatible_surface: None, //Some(&surface),
-            },
-            wgpu::BackendBit::PRIMARY,
-        )
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::Default,
+            compatible_surface: None, //Some(&surface),
+        })
         .await
         .unwrap();
 
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
-                extensions: wgpu::Extensions {
-                    anisotropic_filtering: false,
-                },
+                features: wgpu::Features::empty(),
                 limits: wgpu::Limits::default(),
+                shader_validation: true,
             },
             /*        match trace_dir {
                 Ok(ref value) if !cfg!(feature = "trace") => {
@@ -59,10 +55,20 @@ async fn app() {
     let event_loop = winit::event_loop::EventLoop::new();
     let window = builder.with_visible(false).build(&event_loop).unwrap();
 
-    let mut framebuffer = wgpu_util::Framebuffer::new(&instance, &window);
+    let mut framebuffer = wgpu_util::Framebuffer::new_from_window(&instance, &window);
+
+    let mut tex_fb = wgpu_util::Framebuffer::new_texture(wgpu::TextureFormat::Rgba8UnormSrgb);
+
+    tex_fb.set_clear_color(&[0.2, 0.3, 0.7, 1.0]);
 
     let sz = window.inner_size();
-    framebuffer.resize(&device, sz.width, sz.height, true);
+    framebuffer.reconfigure(
+        &device,
+        &framebuffer
+            .configuration()
+            .with_resolution(sz.width, sz.height)
+            .with_depth_format(wgpu::TextureFormat::Depth24Plus),
+    );
 
     framebuffer.set_clear_color(&[0.7, 0.3, 0.2, 1.0]);
 
@@ -72,7 +78,8 @@ async fn app() {
     // long as it was created as hidden, but need to check other platforms
     // (tested on osx)
     let cmd_buf = frame(&device, &mut framebuffer);
-    queue.submit(Some(cmd_buf));
+
+    queue.submit(vec![cmd_buf]);
     window.set_visible(true);
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -88,7 +95,12 @@ async fn app() {
             event: WindowEvent::Resized(size),
             ..
         } => {
-            framebuffer.resize(&device, size.width, size.height, true);
+            framebuffer.reconfigure(
+                &device,
+                &framebuffer
+                    .configuration()
+                    .with_resolution(size.width, size.height),
+            );
         }
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput {
