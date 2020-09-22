@@ -1,5 +1,5 @@
 #[derive(Debug)]
-enum FramebufferTarget {
+enum FramebufferAttachment {
     Surface {
         surface: wgpu::Surface,
         swap_chain: Option<wgpu::SwapChain>,
@@ -13,12 +13,9 @@ enum FramebufferTarget {
 }
 #[derive(Debug)]
 pub struct Framebuffer {
-    target: FramebufferTarget,
-    // surface: wgpu::Surface,
-    // swap_chain: Option<wgpu::SwapChain>,
+    attachments: Vec<FramebufferAttachment>,
     depth_texture_view: Option<wgpu::TextureView>,
     clear_color: [f64; 4],
-    //    resolution: (u32, u32),
     configuration: FramebufferConfiguration,
 }
 
@@ -61,29 +58,41 @@ impl Framebuffer {
         Self::new_from_surface(surface)
     }
     pub fn new_from_surface(surface: wgpu::Surface) -> Framebuffer {
-        Framebuffer {
-            target: FramebufferTarget::Surface {
-                surface,
-                swap_chain: None,
-                frame: None,
-            },
+        let mut fb = Framebuffer {
+            attachments: Vec::new(),
             depth_texture_view: None,
             clear_color: [0f64, 0f64, 0f64, 1f64],
             configuration: FramebufferConfiguration::default(), //            resolution: (0, 0),
-        }
+        };
+        fb.add_surface_attachment(surface);
+        fb
     }
 
-    pub fn new_texture(color_format: wgpu::TextureFormat) -> Framebuffer {
-        Framebuffer {
-            target: FramebufferTarget::Texture {
-                color_format,
-                color_texture: None,
-                texture_view: None,
-            },
+    pub fn new_with_texture(color_format: wgpu::TextureFormat) -> Framebuffer {
+        let mut fb = Framebuffer {
+            attachments: Vec::new(),
             depth_texture_view: None,
             clear_color: [0f64, 0f64, 0f64, 1f64],
             configuration: FramebufferConfiguration::default(),
-        }
+        };
+        fb.add_texture_attachment(color_format);
+        fb
+    }
+
+    pub fn add_surface_attachment(&mut self, surface: wgpu::Surface) {
+        self.attachments.push(FramebufferAttachment::Surface {
+            surface,
+            swap_chain: None,
+            frame: None,
+        });
+    }
+
+    pub fn add_texture_attachment(&mut self, color_format: wgpu::TextureFormat) {
+        self.attachments.push(FramebufferAttachment::Texture {
+            color_format,
+            color_texture: None,
+            texture_view: None,
+        });
     }
 
     pub fn configuration(&self) -> &FramebufferConfiguration {
@@ -117,46 +126,49 @@ impl Framebuffer {
             height: self.configuration.height(),
             present_mode: wgpu::PresentMode::Mailbox,
         };
-        match &mut self.target {
-            FramebufferTarget::Surface {
-                ref mut surface,
-                ref mut swap_chain,
-                ref mut frame,
-            } => {
-                *frame = None; // SwapChainFrame must be dropped debug creating creating new swapchain
-                let new_swap_chain = device.create_swap_chain(&surface, &sc_desc);
-                *swap_chain = Some(new_swap_chain);
-            }
-            FramebufferTarget::Texture {
-                ref color_format,
-                ref mut color_texture,
-                ref mut texture_view,
-            } => {
-                let texture = device.create_texture(&wgpu::TextureDescriptor {
-                    label: Some("Framebuffer Texture"),
-                    size: wgpu::Extent3d {
-                        width: self.configuration.width(),
-                        height: self.configuration.height(),
-                        depth: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: *color_format,
-                    usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
-                });
-                let tex_view = texture.create_view(&wgpu::TextureViewDescriptor {
-                    label: Some("Framebuffer Texture view"),
-                    format: Some(*color_format),
-                    dimension: Some(wgpu::TextureViewDimension::D2),
-                    aspect: wgpu::TextureAspect::All,
-                    base_mip_level: 0,
-                    level_count: None,
-                    base_array_layer: 0,
-                    array_layer_count: None,
-                });
-                *texture_view = Some(tex_view);
-                *color_texture = Some(texture);
+
+        for attachment in &mut self.attachments {
+            match attachment {
+                FramebufferAttachment::Surface {
+                    ref mut surface,
+                    ref mut swap_chain,
+                    ref mut frame,
+                } => {
+                    *frame = None; // SwapChainFrame must be dropped debug creating creating new swapchain
+                    let new_swap_chain = device.create_swap_chain(&surface, &sc_desc);
+                    *swap_chain = Some(new_swap_chain);
+                }
+                FramebufferAttachment::Texture {
+                    ref color_format,
+                    ref mut color_texture,
+                    ref mut texture_view,
+                } => {
+                    let texture = device.create_texture(&wgpu::TextureDescriptor {
+                        label: Some("Framebuffer Texture"),
+                        size: wgpu::Extent3d {
+                            width: self.configuration.width(),
+                            height: self.configuration.height(),
+                            depth: 1,
+                        },
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: *color_format,
+                        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+                    });
+                    let tex_view = texture.create_view(&wgpu::TextureViewDescriptor {
+                        label: Some("Framebuffer Texture view"),
+                        format: Some(*color_format),
+                        dimension: Some(wgpu::TextureViewDimension::D2),
+                        aspect: wgpu::TextureAspect::All,
+                        base_mip_level: 0,
+                        level_count: None,
+                        base_array_layer: 0,
+                        array_layer_count: None,
+                    });
+                    *texture_view = Some(tex_view);
+                    *color_texture = Some(texture);
+                }
             }
         }
 
@@ -198,76 +210,46 @@ impl Framebuffer {
         // dropped before self or encoder, as the RenderPass will refer to
         // values in them
 
-        match &mut self.target {
-            FramebufferTarget::Surface {
-                surface: _,
-                swap_chain,
-                ref mut frame,
-            } => {
-                let swap_chain = swap_chain.as_mut().expect(
+        let mut color_attachments = Vec::new();
+
+        // TODO: retain the vec, update only when dirty or surface attachment
+        for attachment in &mut self.attachments {
+            match attachment {
+                FramebufferAttachment::Surface {
+                    surface: _,
+                    swap_chain,
+                    ref mut frame,
+                } => {
+                    let swap_chain = swap_chain.as_mut().expect(
                     "swap chain is missing, did you remember to call `resize` before `begin_render_pass`",
                 );
-                *frame = None;
-                let new_frame = swap_chain
-                    .get_current_frame()
-                    .expect("Timeout when acquiring next swap chain texture");
+                    *frame = None;
+                    let new_frame = swap_chain
+                        .get_current_frame()
+                        .expect("Timeout when acquiring next swap chain texture");
 
-                *frame = Some(new_frame);
-                let frame_view = &frame.as_mut().unwrap().output.view;
-
-                let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: frame_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: self.clear_color[0],
-                        g: self.clear_color[1],
-                        b: self.clear_color[2],
-                        a: self.clear_color[3],
-                    }),
-                    store: true
+                    *frame = Some(new_frame);
+                    let frame_view = &frame.as_mut().unwrap().output.view;
+                    color_attachments.push(wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: frame_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: self.clear_color[0],
+                                g: self.clear_color[1],
+                                b: self.clear_color[2],
+                                a: self.clear_color[3],
+                            }),
+                            store: true,
+                        },
+                    });
                 }
-                // load_op: wgpu::LoadOp::Clear,
-                // store_op: wgpu::StoreOp::Store,
-                // clear_color: wgpu::Color {
-                //     r: self.clear_color[0],
-                //     g: self.clear_color[1],
-                //     b: self.clear_color[2],
-                //     a: self.clear_color[3],
-                // },
-            }],
-                    depth_stencil_attachment: self.depth_texture_view.as_ref().map(|tex| {
-                        wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                            attachment: tex,
-                            depth_ops: Some(wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(1.0),
-                                store: false,
-                            }),
-                            stencil_ops: Some(wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(0),
-                                store: false,
-                            }),
-                            // depth_load_op: wgpu::LoadOp::Clear,
-                            // depth_store_op: wgpu::StoreOp::Store,
-                            // stencil_load_op: wgpu::LoadOp::Clear,
-                            // stencil_store_op: wgpu::StoreOp::Store,
-                            // clear_depth: 1.0,
-                            // clear_stencil: 0,
-                            // depth_read_only: false,
-                            // stencil_read_only: false,
-                        }
-                    }),
-                });
-                pass
-            }
-            FramebufferTarget::Texture {
-                color_texture: _,
-                color_format: _,
-                texture_view,
-            } => {
-                let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                FramebufferAttachment::Texture {
+                    color_texture: _,
+                    color_format: _,
+                    texture_view,
+                } => {
+                    color_attachments.push(wgpu::RenderPassColorAttachmentDescriptor {
                         attachment: &texture_view.as_ref().expect("Texture not configured"),
                         resolve_target: None,
                         ops: wgpu::Operations {
@@ -279,31 +261,27 @@ impl Framebuffer {
                             }),
                             store: true,
                         },
-                    }],
-                    depth_stencil_attachment: self.depth_texture_view.as_ref().map(|tex| {
-                        wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                            attachment: tex,
-                            depth_ops: Some(wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(1.0),
-                                store: false,
-                            }),
-                            stencil_ops: Some(wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(0),
-                                store: false,
-                            }),
-                            // depth_load_op: wgpu::LoadOp::Clear,
-                            // depth_store_op: wgpu::StoreOp::Store,
-                            // stencil_load_op: wgpu::LoadOp::Clear,
-                            // stencil_store_op: wgpu::StoreOp::Store,
-                            // clear_depth: 1.0,
-                            // clear_stencil: 0,
-                            // depth_read_only: false,
-                            // stencil_read_only: false,
-                        }
-                    }),
-                });
-                pass
+                    });
+                }
             }
         }
+
+        let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            color_attachments: &color_attachments,
+            depth_stencil_attachment: self.depth_texture_view.as_ref().map(|tex| {
+                wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: tex,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: false,
+                    }),
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0),
+                        store: false,
+                    }),
+                }
+            }),
+        });
+        pass
     }
 }

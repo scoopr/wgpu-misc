@@ -57,7 +57,7 @@ async fn app() {
 
     let mut framebuffer = wgpu_util::Framebuffer::new_from_window(&instance, &window);
 
-    let mut tex_fb = wgpu_util::Framebuffer::new_texture(wgpu::TextureFormat::Rgba8UnormSrgb);
+    let mut tex_fb = wgpu_util::Framebuffer::new_with_texture(wgpu::TextureFormat::Rgba8UnormSrgb);
 
     tex_fb.set_clear_color(&[0.2, 0.3, 0.7, 1.0]);
 
