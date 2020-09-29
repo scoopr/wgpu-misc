@@ -55,20 +55,16 @@ async fn app() {
     let event_loop = winit::event_loop::EventLoop::new();
     let window = builder.with_visible(false).build(&event_loop).unwrap();
 
-    let mut framebuffer = wgpu_util::Framebuffer::new_from_window(&instance, &window);
+    let mut framebuffer = wgpu_util::Framebuffer::new_from_window(&instance, &window, wgpu::TextureFormat::Bgra8UnormSrgb);
 
     let mut tex_fb = wgpu_util::Framebuffer::new_with_texture(wgpu::TextureFormat::Rgba8UnormSrgb);
 
     tex_fb.set_clear_color(&[0.2, 0.3, 0.7, 1.0]);
 
     let sz = window.inner_size();
-    framebuffer.reconfigure(
-        &device,
-        &framebuffer
-            .configuration()
-            .with_resolution(sz.width, sz.height)
-            .with_depth_format(wgpu::TextureFormat::Depth24Plus),
-    );
+    framebuffer.set_resolution(sz.width, sz.height);
+    framebuffer.set_depth_format(wgpu::TextureFormat::Depth24Plus);
+    framebuffer.assemble(&device);
 
     framebuffer.set_clear_color(&[0.7, 0.3, 0.2, 1.0]);
 
@@ -80,6 +76,7 @@ async fn app() {
     let cmd_buf = frame(&device, &mut framebuffer);
 
     queue.submit(vec![cmd_buf]);
+    framebuffer.present();
     window.set_visible(true);
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -90,17 +87,14 @@ async fn app() {
             let cmd_buf = frame(&device, &mut framebuffer);
 
             queue.submit(Some(cmd_buf));
+            framebuffer.present();
         }
         Event::WindowEvent {
             event: WindowEvent::Resized(size),
             ..
         } => {
-            framebuffer.reconfigure(
-                &device,
-                &framebuffer
-                    .configuration()
-                    .with_resolution(size.width, size.height),
-            );
+            framebuffer.set_resolution(size.width, size.height);
+            framebuffer.assemble(&device);
         }
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput {
