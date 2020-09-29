@@ -55,7 +55,11 @@ async fn app() {
     let event_loop = winit::event_loop::EventLoop::new();
     let window = builder.with_visible(false).build(&event_loop).unwrap();
 
-    let mut framebuffer = wgpu_util::Framebuffer::new_from_window(&instance, &window, wgpu::TextureFormat::Bgra8UnormSrgb);
+    let mut framebuffer = wgpu_util::Framebuffer::new_from_window(
+        &instance,
+        &window,
+        wgpu::TextureFormat::Bgra8UnormSrgb,
+    );
 
     let mut tex_fb = wgpu_util::Framebuffer::new_with_texture(wgpu::TextureFormat::Rgba8UnormSrgb);
 
@@ -63,7 +67,7 @@ async fn app() {
 
     let sz = window.inner_size();
     framebuffer.set_resolution(sz.width, sz.height);
-    framebuffer.set_depth_format(wgpu::TextureFormat::Depth24Plus);
+    framebuffer.set_depth_stencil_format(Some(wgpu::TextureFormat::Depth24Plus));
     framebuffer.assemble(&device);
 
     framebuffer.set_clear_color(&[0.7, 0.3, 0.2, 1.0]);

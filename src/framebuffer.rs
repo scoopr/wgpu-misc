@@ -36,21 +36,45 @@ enum ColorAttachmentData {
 }
 #[derive(Debug)]
 pub struct Framebuffer {
-    color_attachments: Vec<ColorAttachment>,
-    sample_count: u32,
     resolution: (u32, u32),
+    sample_count: u32,
 
-    live_frame: Vec<wgpu::SwapChainFrame>,
-
+    color_attachments: Vec<ColorAttachment>,
     depth_stencil_format: Option<wgpu::TextureFormat>,
     depth_stencil_view: Option<wgpu::TextureView>,
 
+    live_frame: Vec<wgpu::SwapChainFrame>,
     present_mode: wgpu::PresentMode,
 
     dirty: bool,
 }
 
+/// Framebuffer manages
+/// * Color attachments, such as surfaces and textures,
+/// * Depth-stencil attachment
+/// * Multisampling
+/// * Creation of `wgpu::RenderPass` for them.
+/// * Handles recreating them after resolution or sample count change
+///
+/// Simplest use case for your bog standard rendering might look like
+/// ```
+///    let mut framebuffer = Framebuffer::new_from_window(&window, wgpu::TextureFormat::Bgra8UnormSrgb);
+///    framebuffer.set_resolution(window_width, window_height);
+///    framebuffer.set_depth_stencil_format(Some(wgpu::TextureFormat::Depth24Plus));
+///    framebuffer.assemble(&device); // Creates the resources, needs to be always called after resource invalidation
+///
+///    {
+///        let pass = framebuffer.begin_render_pass(&encoder);
+///        // .. do stuff with pass
+///    }
+///
+///    queue.submit(Some(encoder.finish()));
+///    framebuffer.present(); // Tells the swapchain that the frame is finished
+///    
+/// ```
+///
 impl Framebuffer {
+    /// Creates a new Framebuffer with no color attachments
     pub fn new() -> Framebuffer {
         Framebuffer {
             color_attachments: Vec::new(),
@@ -64,27 +88,39 @@ impl Framebuffer {
         }
     }
 
+    /// Creates a new Framebuffer that renders to the surface of a window
     pub fn new_from_window<W: raw_window_handle::HasRawWindowHandle>(
         instance: &wgpu::Instance,
         window: &W,
-color_format: wgpu::TextureFormat
+        color_format: wgpu::TextureFormat,
     ) -> Framebuffer {
         let surface = unsafe { instance.create_surface(window) };
         Self::new_from_surface(surface, color_format)
     }
-    pub fn new_from_surface(surface: wgpu::Surface, color_format: wgpu::TextureFormat) -> Framebuffer {
+
+    /// Create a new Framebuffer that renders to a surface
+    pub fn new_from_surface(
+        surface: wgpu::Surface,
+        color_format: wgpu::TextureFormat,
+    ) -> Framebuffer {
         let mut fb = Framebuffer::new();
         fb.add_surface_attachment(surface, color_format);
         fb
     }
 
+    /// Create a new Framebuffer that renders to a texture
     pub fn new_with_texture(color_format: wgpu::TextureFormat) -> Framebuffer {
         let mut fb = Framebuffer::new();
         fb.add_texture_attachment(color_format);
         fb
     }
 
-    pub fn add_surface_attachment(&mut self, surface: wgpu::Surface,color_format: wgpu::TextureFormat) {
+    /// Adds a color attachment that renders to a surface
+    pub fn add_surface_attachment(
+        &mut self,
+        surface: wgpu::Surface,
+        color_format: wgpu::TextureFormat,
+    ) {
         self.color_attachments.push(ColorAttachment {
             data: ColorAttachmentData::Surface {
                 surface,
@@ -95,8 +131,10 @@ color_format: wgpu::TextureFormat
             assembled: None,
             clear_color: [0.0, 0.0, 0.0, 0.0f64],
         });
+        self.dirty = true;
     }
 
+    /// Adds a color attachment that renders to a texture
     pub fn add_texture_attachment(&mut self, color_format: wgpu::TextureFormat) {
         self.color_attachments.push(ColorAttachment {
             data: ColorAttachmentData::Texture {
@@ -106,45 +144,68 @@ color_format: wgpu::TextureFormat
             assembled: None,
             clear_color: [0.0, 0.0, 0.0, 0.0f64],
         });
+        self.dirty = true;
     }
 
+    /// Returns the number of color attachments bound to the `Framebuffer`
+    pub fn color_attachment_count(&self) -> usize {
+        self.color_attachments.len()
+    }
+
+    /// Sets the clear color of all attachments
     pub fn set_clear_color(&mut self, clear_color: &[f64; 4]) {
         for attachment in &mut self.color_attachments {
             attachment.clear_color = *clear_color;
         }
     }
 
+    /// Set the sample count, 1 for no multisampling.
+    /// Invalidates resources, requires `aseemble`
+    /// Default is 1
     pub fn set_sample_count(&mut self, sample_count: u32) {
         self.sample_count = sample_count;
         self.dirty = true;
+        self.invalidate_resources();
     }
 
-    pub fn set_depth_format(&mut self, format: wgpu::TextureFormat) {
-        self.depth_stencil_format = Some(format);
+    /// Sets the depth-stencil texture format, or None if no depth-stencil is needed
+    /// Defaults to none
+    /// Invalidates resource, requires `assemble`
+    pub fn set_depth_stencil_format(&mut self, format: Option<wgpu::TextureFormat>) {
+        self.depth_stencil_format = format;
+        self.dirty = true;
+        self.invalidate_depth_stencil();
     }
 
-    // Returns sample count, 1 meaning no multisampling
+    /// Returns sample count, 1 meaning no multisampling
     pub fn sample_count(&self) -> u32 {
         self.sample_count
     }
 
-    // Returns width
+    /// Returns width
     pub fn width(&self) -> u32 {
         self.resolution.0
     }
 
-    // Returns height
+    /// Returns height
     pub fn height(&self) -> u32 {
         self.resolution.1
     }
 
-    // Sets the resolution for all the attachments.
-    // Invalidates resources, requires `assemble`
+    /// Sets the resolution for all the attachments.
+    /// Invalidates resources, requires `assemble`
     pub fn set_resolution(&mut self, width: u32, height: u32) {
         self.resolution = (width, height);
         self.dirty = true;
+        self.invalidate_resources();
     }
 
+    /// Returns if resources had been invalidated, and needs `assemble`
+    pub fn needs_assemble(&self) -> bool {
+        self.dirty
+    }
+
+    /// (re)creates all the resources with the current configuration
     pub fn assemble(&mut self, device: &wgpu::Device) {
         debug_assert!(
             !self.needs_present(),
@@ -155,12 +216,6 @@ color_format: wgpu::TextureFormat
             return;
         }
         self.dirty = false;
-
-        let surface_colorformat = if cfg!(target_arch = "wasm32") {
-            wgpu::TextureFormat::Bgra8Unorm
-        } else {
-            wgpu::TextureFormat::Bgra8UnormSrgb
-        };
 
         for attachment in &mut self.color_attachments {
             let mut output_view = None;
@@ -224,7 +279,7 @@ color_format: wgpu::TextureFormat
                     mip_level_count: 1,
                     sample_count: self.sample_count,
                     dimension: wgpu::TextureDimension::D2,
-                    format: surface_colorformat,
+                    format: attachment.color_format,
                     usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
                 });
                 let msaa_view =
@@ -265,14 +320,14 @@ color_format: wgpu::TextureFormat
         }
     }
 
-    // Check if there is a live swapchain frame
+    /// Check if there is a live swapchain frame
     pub fn needs_present(&self) -> bool {
         !self.live_frame.is_empty()
     }
 
-    // If the Framebuffer has an live swapchain frame, present it.
-    // Needs to be called between after the last render pass that uses it
-    // is submitted (but before acquiring a new one)
+    /// If the Framebuffer has an live swapchain frame, present it.
+    /// Needs to be called between after the last render pass that uses it
+    /// is submitted (but before acquiring a new one)
     pub fn present(&mut self) {
         debug_assert!(self.needs_present());
 
@@ -280,6 +335,8 @@ color_format: wgpu::TextureFormat
         self.live_frame.clear();
     }
 
+    /// Begins a render pass
+    /// Remember to `present` after pass is submitted.
     pub fn begin_render_pass<'a>(
         &'a mut self,
         encoder: &'a mut wgpu::CommandEncoder,
@@ -381,5 +438,18 @@ color_format: wgpu::TextureFormat
             color_attachments: &color_attachments,
             depth_stencil_attachment: depth_stencil_attachment,
         })
+    }
+
+    fn invalidate_color_attachments(&mut self) {
+        for attachment in &mut self.color_attachments {
+            attachment.assembled = None;
+        }
+    }
+    fn invalidate_depth_stencil(&mut self) {
+        self.depth_stencil_view = None;
+    }
+    fn invalidate_resources(&mut self) {
+        self.invalidate_color_attachments();
+        self.invalidate_depth_stencil();
     }
 }
