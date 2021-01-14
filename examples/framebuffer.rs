@@ -26,7 +26,7 @@ async fn app() {
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::Default,
+            power_preference: wgpu::PowerPreference::LowPower,
             compatible_surface: None, //Some(&surface),
         })
         .await
@@ -35,9 +35,9 @@ async fn app() {
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
+                label: Some("device"),
                 features: wgpu::Features::empty(),
                 limits: wgpu::Limits::default(),
-                shader_validation: true,
             },
             /*        match trace_dir {
                 Ok(ref value) if !cfg!(feature = "trace") => {

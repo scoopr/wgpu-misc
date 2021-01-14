@@ -200,6 +200,24 @@ impl Framebuffer {
         self.invalidate_resources();
     }
 
+    pub fn attachment_view(&self, idx: usize) -> Option<&wgpu::TextureView> {
+        self.color_attachments[idx]
+            .assembled
+            .as_ref()
+            .map(|a| a.resolve_view.as_ref().or(a.attachment_view.as_ref()))
+            .flatten()
+    }
+
+    pub fn attachment_texture(&self, idx: usize) -> Option<&wgpu::Texture> {
+        match &self.color_attachments[idx]
+            .data {
+                ColorAttachmentData::Surface { .. } => { None }
+                ColorAttachmentData::Texture { color_texture } => {
+                    color_texture.as_ref()
+                }
+            }
+    }
+
     /// Returns if resources had been invalidated, and needs `assemble`
     pub fn needs_assemble(&self) -> bool {
         self.dirty
@@ -226,7 +244,7 @@ impl Framebuffer {
                     ref mut frame,
                 } => {
                     let sc_desc = wgpu::SwapChainDescriptor {
-                        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+                        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
                         format: attachment.color_format,
                         width: self.resolution.0,
                         height: self.resolution.1,
@@ -251,7 +269,7 @@ impl Framebuffer {
                         sample_count: 1,
                         dimension: wgpu::TextureDimension::D2,
                         format: attachment.color_format,
-                        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+                        usage: wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
                     });
                     let tex_view = texture.create_view(&wgpu::TextureViewDescriptor {
                         label: Some("Framebuffer Texture view"),
@@ -280,7 +298,7 @@ impl Framebuffer {
                     sample_count: self.sample_count,
                     dimension: wgpu::TextureDimension::D2,
                     format: attachment.color_format,
-                    usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+                    usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
                 });
                 let msaa_view =
                     Some(msaa_texture.create_view(&wgpu::TextureViewDescriptor::default()));
@@ -312,7 +330,7 @@ impl Framebuffer {
                         sample_count: self.sample_count,
                         dimension: wgpu::TextureDimension::D2,
                         format: depth_format,
-                        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+                        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
                         label: Some("wgpu-util depth texture"),
                     })
                     .create_view(&wgpu::TextureViewDescriptor::default()),
@@ -435,6 +453,7 @@ impl Framebuffer {
         });
 
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("fb render pass"),
             color_attachments: &color_attachments,
             depth_stencil_attachment: depth_stencil_attachment,
         })
