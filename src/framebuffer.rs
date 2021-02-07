@@ -433,7 +433,7 @@ impl Framebuffer {
                         b: attachment.clear_color[2],
                         a: attachment.clear_color[3],
                     }),
-                    store: true,
+                    store: !resolve_view.is_some(),
                 },
             });
         }
