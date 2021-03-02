@@ -263,7 +263,7 @@ impl Framebuffer {
                         size: wgpu::Extent3d {
                             width: self.resolution.0,
                             height: self.resolution.1,
-                            depth: 1,
+                            depth_or_array_layers: 1,
                         },
                         mip_level_count: 1,
                         sample_count: 1,
@@ -292,7 +292,7 @@ impl Framebuffer {
                     size: wgpu::Extent3d {
                         width: self.resolution.0,
                         height: self.resolution.1,
-                        depth: 1,
+                        depth_or_array_layers: 1,
                     },
                     mip_level_count: 1,
                     sample_count: self.sample_count,
@@ -324,7 +324,7 @@ impl Framebuffer {
                         size: wgpu::Extent3d {
                             width: self.width(),
                             height: self.height(),
-                            depth: 1,
+                            depth_or_array_layers: 1,
                         },
                         mip_level_count: 1,
                         sample_count: self.sample_count,
