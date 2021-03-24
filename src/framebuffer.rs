@@ -423,8 +423,8 @@ impl Framebuffer {
                 }
             }
 
-            color_attachments.push(wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: attachment_view,
+            color_attachments.push(wgpu::RenderPassColorAttachment {
+                view: attachment_view,
                 resolve_target: resolve_view,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -439,8 +439,8 @@ impl Framebuffer {
         }
 
         let depth_stencil_attachment = self.depth_stencil_view.as_ref().map(|tex| {
-            wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                attachment: tex,
+            wgpu::RenderPassDepthStencilAttachment {
+                view: tex,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
                     store: false,
