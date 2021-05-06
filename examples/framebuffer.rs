@@ -1,10 +1,6 @@
 use winit::{
     self,
-    event::{
-        self,
-        Event::{self},
-        WindowEvent,
-    },
+    event::{self, Event, WindowEvent},
     event_loop,
 };
 
@@ -36,14 +32,6 @@ async fn app() {
                 features: wgpu::Features::empty(),
                 limits: wgpu::Limits::default(),
             },
-            /*        match trace_dir {
-                Ok(ref value) if !cfg!(feature = "trace") => {
-                    log::error!("Unable to trace into {:?} without \"trace\" feature enabled!", value);
-                    None
-                }
-                Ok(ref value) => Some(std::path::Path::new(value)),
-                Err(_) => None,
-            },*/
             None,
         )
         .await
@@ -76,7 +64,7 @@ async fn app() {
     // (tested on osx)
     let cmd_buf = frame(&device, &mut framebuffer);
 
-    queue.submit(vec![cmd_buf]);
+    queue.submit(Some(cmd_buf));
     framebuffer.present();
     window.set_visible(true);
 

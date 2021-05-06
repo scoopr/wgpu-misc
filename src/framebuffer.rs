@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 struct ColorAttachment {
     data: ColorAttachmentData,
@@ -204,7 +203,11 @@ impl Framebuffer {
         self.color_attachments[idx]
             .configured
             .as_ref()
-            .map(|a| a.resolve_view.as_ref().or_else(|| a.attachment_view.as_ref()))
+            .map(|a| {
+                a.resolve_view
+                    .as_ref()
+                    .or_else(|| a.attachment_view.as_ref())
+            })
             .flatten()
     }
 
