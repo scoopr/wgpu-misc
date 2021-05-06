@@ -13,12 +13,12 @@ TODO:
 struct ColorAttachment {
     data: ColorAttachmentData,
     color_format: wgpu::TextureFormat,
-    assembled: Option<ColorAttachmentAssembled>,
+    configured: Option<ColorAttachmentConfigured>,
     clear_color: [f64; 4],
 }
 
 #[derive(Debug)]
-struct ColorAttachmentAssembled {
+struct ColorAttachmentConfigured {
     multisample_texture: Option<wgpu::Texture>,
     attachment_view: Option<wgpu::TextureView>,
     resolve_view: Option<wgpu::TextureView>,
@@ -61,7 +61,7 @@ pub struct Framebuffer {
 ///    let mut framebuffer = Framebuffer::new_from_window(&window, wgpu::TextureFormat::Bgra8UnormSrgb);
 ///    framebuffer.set_resolution(window_width, window_height);
 ///    framebuffer.set_depth_stencil_format(Some(wgpu::TextureFormat::Depth24Plus));
-///    framebuffer.assemble(&device); // Creates the resources, needs to be always called after resource invalidation
+///    framebuffer.configure(&device); // Creates the resources, needs to be always called after resource invalidation
 ///
 ///    {
 ///        let pass = framebuffer.begin_render_pass(&encoder);
@@ -128,7 +128,7 @@ impl Framebuffer {
                 frame: None,
             },
             color_format: color_format,
-            assembled: None,
+            configured: None,
             clear_color: [0.0, 0.0, 0.0, 0.0f64],
         });
         self.dirty = true;
@@ -141,7 +141,7 @@ impl Framebuffer {
                 color_texture: None,
             },
             color_format,
-            assembled: None,
+            configured: None,
             clear_color: [0.0, 0.0, 0.0, 0.0f64],
         });
         self.dirty = true;
@@ -175,7 +175,7 @@ impl Framebuffer {
 
     /// Sets the depth-stencil texture format, or None if no depth-stencil is needed
     /// Defaults to none
-    /// Invalidates resource, requires `assemble`
+    /// Invalidates resource, requires `configure`
     pub fn set_depth_stencil_format(&mut self, format: Option<wgpu::TextureFormat>) {
         self.depth_stencil_format = format;
         self.dirty = true;
@@ -198,7 +198,7 @@ impl Framebuffer {
     }
 
     /// Sets the resolution for all the attachments.
-    /// Invalidates resources, requires `assemble`
+    /// Invalidates resources, requires `configure`
     pub fn set_resolution(&mut self, width: u32, height: u32) {
         self.resolution = (width, height);
         self.dirty = true;
@@ -207,7 +207,7 @@ impl Framebuffer {
 
     pub fn attachment_view(&self, idx: usize) -> Option<&wgpu::TextureView> {
         self.color_attachments[idx]
-            .assembled
+            .configured
             .as_ref()
             .map(|a| a.resolve_view.as_ref().or(a.attachment_view.as_ref()))
             .flatten()
@@ -223,13 +223,13 @@ impl Framebuffer {
             }
     }
 
-    /// Returns if resources had been invalidated, and needs `assemble`
-    pub fn needs_assemble(&self) -> bool {
+    /// Returns if resources had been invalidated, and needs `configure`
+    pub fn needs_configure(&self) -> bool {
         self.dirty
     }
 
     /// (re)creates all the resources with the current configuration
-    pub fn assemble(&mut self, device: &wgpu::Device) {
+    pub fn configure(&mut self, device: &wgpu::Device) {
         debug_assert!(
             !self.needs_present(),
             "Live swapchain frames that were not presented while reconfiguring!"
@@ -308,13 +308,13 @@ impl Framebuffer {
                 let msaa_view =
                     Some(msaa_texture.create_view(&wgpu::TextureViewDescriptor::default()));
 
-                attachment.assembled = Some(ColorAttachmentAssembled {
+                attachment.configured = Some(ColorAttachmentConfigured {
                     multisample_texture: Some(msaa_texture),
                     attachment_view: msaa_view,
                     resolve_view: output_view,
                 });
             } else {
-                attachment.assembled = Some(ColorAttachmentAssembled {
+                attachment.configured = Some(ColorAttachmentConfigured {
                     multisample_texture: None,
                     attachment_view: output_view,
                     resolve_view: None,
@@ -401,13 +401,13 @@ impl Framebuffer {
                 ColorAttachmentData::Surface { .. } => {
                     let frame_view = &self.live_frame.get(swapchain_idx).unwrap().output.view;
 
-                    let assembled = attachment
-                        .assembled
+                    let configured = attachment
+                        .configured
                         .as_ref()
-                        .expect("Unconfigured attachment, did you call assemble()?");
+                        .expect("Unconfigured attachment, did you call configure()?");
 
-                    if assembled.attachment_view.is_some() {
-                        attachment_view = assembled.attachment_view.as_ref().unwrap();
+                    if configured.attachment_view.is_some() {
+                        attachment_view = configured.attachment_view.as_ref().unwrap();
                         resolve_view = Some(frame_view);
                     } else {
                         attachment_view = frame_view;
@@ -418,13 +418,13 @@ impl Framebuffer {
                 }
                 ColorAttachmentData::Texture { color_texture: _ } => {
                     attachment_view = attachment
-                        .assembled
+                        .configured
                         .as_ref()
                         .unwrap()
                         .attachment_view
                         .as_ref()
                         .unwrap();
-                    resolve_view = attachment.assembled.as_ref().unwrap().resolve_view.as_ref();
+                    resolve_view = attachment.configured.as_ref().unwrap().resolve_view.as_ref();
                 }
             }
 
@@ -466,7 +466,7 @@ impl Framebuffer {
 
     fn invalidate_color_attachments(&mut self) {
         for attachment in &mut self.color_attachments {
-            attachment.assembled = None;
+            attachment.configured = None;
         }
     }
     fn invalidate_depth_stencil(&mut self) {

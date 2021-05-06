@@ -68,7 +68,7 @@ async fn app() {
     let sz = window.inner_size();
     framebuffer.set_resolution(sz.width, sz.height);
     framebuffer.set_depth_stencil_format(Some(wgpu::TextureFormat::Depth24Plus));
-    framebuffer.assemble(&device);
+    framebuffer.configure(&device);
 
     framebuffer.set_clear_color(&[0.7, 0.3, 0.2, 1.0]);
 
@@ -98,7 +98,7 @@ async fn app() {
             ..
         } => {
             framebuffer.set_resolution(size.width, size.height);
-            framebuffer.assemble(&device);
+            framebuffer.configure(&device);
         }
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput {
