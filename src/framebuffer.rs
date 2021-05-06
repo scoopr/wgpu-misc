@@ -152,6 +152,11 @@ impl Framebuffer {
         self.color_attachments.len()
     }
 
+    pub fn set_present_mode(&mut self, present_mode: wgpu::PresentMode) {
+        self.present_mode = present_mode;
+        self.dirty = true;
+    }
+
     /// Sets the clear color of all attachments
     pub fn set_clear_color(&mut self, clear_color: &[f64; 4]) {
         for attachment in &mut self.color_attachments {
