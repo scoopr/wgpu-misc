@@ -11,8 +11,7 @@ winit= { version = "0.24.0", features = ["web-sys"] }
 env_logger= "0.8.3"
 
 [dependencies]
-wgpu={ git="https://github.com/gfx-rs/wgpu-rs", version="0.7" }
-# wgpu={ version="0.7" }
+wgpu= "0.8.0"
 raw-window-handle = "0.3.3"
 
 # Native deps
@@ -21,4 +20,4 @@ futures= "0.3.14"
 
 # Wasm deps
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = "0.4.12"
+wasm-bindgen-futures = "0.4.23"
