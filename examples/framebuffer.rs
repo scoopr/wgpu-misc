@@ -8,7 +8,7 @@ use winit::{
     event_loop,
 };
 
-fn frame(device: &wgpu::Device, framebuffer: &mut wgpu_util::Framebuffer) -> wgpu::CommandBuffer {
+fn frame(device: &wgpu::Device, framebuffer: &mut wgpu_misc::Framebuffer) -> wgpu::CommandBuffer {
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
@@ -52,13 +52,13 @@ async fn app() {
     let event_loop = winit::event_loop::EventLoop::new();
     let window = builder.with_visible(false).build(&event_loop).unwrap();
 
-    let mut framebuffer = wgpu_util::Framebuffer::new_from_window(
+    let mut framebuffer = wgpu_misc::Framebuffer::new_from_window(
         &instance,
         &window,
         wgpu::TextureFormat::Bgra8UnormSrgb,
     );
 
-    let mut tex_fb = wgpu_util::Framebuffer::new_with_texture(wgpu::TextureFormat::Rgba8UnormSrgb);
+    let mut tex_fb = wgpu_misc::Framebuffer::new_with_texture(wgpu::TextureFormat::Rgba8UnormSrgb);
 
     tex_fb.set_clear_color(&[0.2, 0.3, 0.7, 1.0]);
 
@@ -118,5 +118,5 @@ async fn app() {
 }
 
 fn main() {
-    wgpu_util::block_on(app);
+    wgpu_misc::block_on(app);
 }

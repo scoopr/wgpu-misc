@@ -53,7 +53,7 @@ pub struct Framebuffer {
 ///    # let (device,instance,mut encoder) = unimplemented!();
 ///    # let window_width = 320;
 ///    # let window_height = 200;
-///    let mut framebuffer = wgpu_util::Framebuffer::new_from_window(&instance, &window, wgpu::TextureFormat::Bgra8UnormSrgb);
+///    let mut framebuffer = wgpu_misc::Framebuffer::new_from_window(&instance, &window, wgpu::TextureFormat::Bgra8UnormSrgb);
 ///    framebuffer.set_resolution(window_width, window_height);
 ///    framebuffer.set_depth_stencil_format(Some(wgpu::TextureFormat::Depth24Plus));
 ///    framebuffer.configure(&device); // Creates the resources, needs to be always called after resource invalidation

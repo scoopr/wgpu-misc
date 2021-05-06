@@ -12,5 +12,5 @@ async fn app() {
 }
 
 fn main() {
-    wgpu_util::block_on(app);
+    wgpu_misc::block_on(app);
 }

@@ -1,5 +1,5 @@
 [package]
-name = "wgpu-util"
+name = "wgpu-misc"
 version = "0.1.0"
 authors = ["Mikko Lehtonen <scoopr@iki.fi>"]
 edition = "2018"
