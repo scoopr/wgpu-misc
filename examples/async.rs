@@ -1,7 +1,3 @@
-use wgpu;
-
-use wgpu_util;
-
 async fn app() {
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
     let adapter = instance

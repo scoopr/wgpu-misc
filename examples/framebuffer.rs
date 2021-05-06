@@ -1,6 +1,3 @@
-use wgpu;
-
-use wgpu_util;
 use winit::{
     self,
     event::{

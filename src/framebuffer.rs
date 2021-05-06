@@ -122,7 +122,7 @@ impl Framebuffer {
                 swap_chain: None,
                 frame: None,
             },
-            color_format: color_format,
+            color_format,
             configured: None,
             clear_color: [0.0, 0.0, 0.0, 0.0f64],
         });
@@ -204,7 +204,7 @@ impl Framebuffer {
         self.color_attachments[idx]
             .configured
             .as_ref()
-            .map(|a| a.resolve_view.as_ref().or(a.attachment_view.as_ref()))
+            .map(|a| a.resolve_view.as_ref().or_else(|| a.attachment_view.as_ref()))
             .flatten()
     }
 
@@ -369,18 +369,15 @@ impl Framebuffer {
         // so that we can mutate self to store them, when the
         // renderpass borrows it
         for attachment in &self.color_attachments {
-            match &attachment.data {
-                ColorAttachmentData::Surface { swap_chain, .. } => {
-                    let swap_chain = swap_chain.as_ref().expect(
-                    "swap chain is missing, did you remember to call `resize` before `begin_render_pass`",
-                );
-                    let new_frame = swap_chain
-                        .get_current_frame()
-                        .expect("Timeout when acquiring next swap chain texture");
+            if let ColorAttachmentData::Surface { swap_chain, .. } = &attachment.data {
+                let swap_chain = swap_chain.as_ref().expect(
+                "swap chain is missing, did you remember to call `resize` before `begin_render_pass`",
+            );
+                let new_frame = swap_chain
+                    .get_current_frame()
+                    .expect("Timeout when acquiring next swap chain texture");
 
-                    self.live_frame.push(new_frame);
-                }
-                _ => {}
+                self.live_frame.push(new_frame);
             }
         }
 
@@ -435,7 +432,7 @@ impl Framebuffer {
                         b: attachment.clear_color[2],
                         a: attachment.clear_color[3],
                     }),
-                    store: !resolve_view.is_some(),
+                    store: resolve_view.is_none(),
                 },
             });
         }
@@ -458,7 +455,7 @@ impl Framebuffer {
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("fb render pass"),
             color_attachments: &color_attachments,
-            depth_stencil_attachment: depth_stencil_attachment,
+            depth_stencil_attachment,
         })
     }
 
@@ -473,5 +470,11 @@ impl Framebuffer {
     fn invalidate_resources(&mut self) {
         self.invalidate_color_attachments();
         self.invalidate_depth_stencil();
+    }
+}
+
+impl Default for Framebuffer {
+    fn default() -> Self {
+        Self::new()
     }
 }

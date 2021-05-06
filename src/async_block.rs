@@ -1,5 +1,3 @@
-#[cfg(not(target_arch = "wasm32"))]
-use futures;
 use std::future::Future;
 
 /// Executes a `async fn` and blocks on it.
