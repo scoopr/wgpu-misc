@@ -1,13 +1,3 @@
-/***
-TODO:
-  attachment load/store config?
-  begin_render_pass with some config, perhaps the load/store, or not. Which attachment is bound.
-  depth only pass?
-
-  some getters.. num_attachments(), get_attachment_format(idx) ?
-
-
-***/
 
 #[derive(Debug)]
 struct ColorAttachment {
