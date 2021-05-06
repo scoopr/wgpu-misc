@@ -5,7 +5,7 @@ use std::future::Future;
 pub fn block_on<F: Future<Output = ()> + 'static>(func: impl FnOnce() -> F) {
     #[cfg(not(target_arch = "wasm32"))]
     {
-        futures::executor::block_on(func());
+        futures_executor::block_on(func());
     }
     #[cfg(target_arch = "wasm32")]
     {
