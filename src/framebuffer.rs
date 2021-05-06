@@ -219,13 +219,10 @@ impl Framebuffer {
     }
 
     pub fn attachment_texture(&self, idx: usize) -> Option<&wgpu::Texture> {
-        match &self.color_attachments[idx]
-            .data {
-                ColorAttachmentData::Surface { .. } => { None }
-                ColorAttachmentData::Texture { color_texture } => {
-                    color_texture.as_ref()
-                }
-            }
+        match &self.color_attachments[idx].data {
+            ColorAttachmentData::Surface { .. } => None,
+            ColorAttachmentData::Texture { color_texture } => color_texture.as_ref(),
+        }
     }
 
     /// Returns if resources had been invalidated, and needs `configure`
@@ -429,7 +426,12 @@ impl Framebuffer {
                         .attachment_view
                         .as_ref()
                         .unwrap();
-                    resolve_view = attachment.configured.as_ref().unwrap().resolve_view.as_ref();
+                    resolve_view = attachment
+                        .configured
+                        .as_ref()
+                        .unwrap()
+                        .resolve_view
+                        .as_ref();
                 }
             }
 
@@ -448,19 +450,20 @@ impl Framebuffer {
             });
         }
 
-        let depth_stencil_attachment = self.depth_stencil_view.as_ref().map(|tex| {
-            wgpu::RenderPassDepthStencilAttachment {
-                view: tex,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: false,
-                }),
-                stencil_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(0),
-                    store: false,
-                }),
-            }
-        });
+        let depth_stencil_attachment =
+            self.depth_stencil_view
+                .as_ref()
+                .map(|tex| wgpu::RenderPassDepthStencilAttachment {
+                    view: tex,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: false,
+                    }),
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0),
+                        store: false,
+                    }),
+                });
 
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("fb render pass"),
