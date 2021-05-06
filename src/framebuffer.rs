@@ -57,14 +57,19 @@ pub struct Framebuffer {
 /// * Handles recreating them after resolution or sample count change
 ///
 /// Simplest use case for your bog standard rendering might look like
-/// ```
-///    let mut framebuffer = Framebuffer::new_from_window(&window, wgpu::TextureFormat::Bgra8UnormSrgb);
+/// ```rust,no_run
+///    # let window : winit::window::Window = unimplemented!();
+///    # let queue : wgpu::Queue = unimplemented!();
+///    # let (device,instance,mut encoder) = unimplemented!();
+///    # let window_width = 320;
+///    # let window_height = 200;
+///    let mut framebuffer = wgpu_util::Framebuffer::new_from_window(&instance, &window, wgpu::TextureFormat::Bgra8UnormSrgb);
 ///    framebuffer.set_resolution(window_width, window_height);
 ///    framebuffer.set_depth_stencil_format(Some(wgpu::TextureFormat::Depth24Plus));
 ///    framebuffer.configure(&device); // Creates the resources, needs to be always called after resource invalidation
 ///
 ///    {
-///        let pass = framebuffer.begin_render_pass(&encoder);
+///        let pass = framebuffer.begin_render_pass(&mut encoder);
 ///        // .. do stuff with pass
 ///    }
 ///
