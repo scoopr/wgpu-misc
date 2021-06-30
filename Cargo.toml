@@ -12,10 +12,11 @@ framebuffer = ["raw-window-handle"]
 
 [dev-dependencies]
 winit = { version = "0.25.0", features = ["web-sys"] }
-env_logger = "0.8.3"
+env_logger = "0.8.4"
 
 [dependencies]
-wgpu = "0.8.1"
+wgpu = { path = "../../ext/wgpu/wgpu", features=["trace","spirv"] }
+#wgpu = "0.8.0"
 raw-window-handle = { version = "0.3.3", optional = true }
 
 # Native deps
@@ -24,4 +25,4 @@ futures-executor = { version = "0.3.15", optional = true }
 
 # Wasm deps
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = { version = "0.4.23", optional = true }
+wasm-bindgen-futures = { version = "0.4.24", optional = true }

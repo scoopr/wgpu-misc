@@ -244,7 +244,7 @@ impl Framebuffer {
                     ref mut frame,
                 } => {
                     let sc_desc = wgpu::SwapChainDescriptor {
-                        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                         format: attachment.color_format,
                         width: self.resolution.0,
                         height: self.resolution.1,
@@ -269,7 +269,8 @@ impl Framebuffer {
                         sample_count: 1,
                         dimension: wgpu::TextureDimension::D2,
                         format: attachment.color_format,
-                        usage: wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                            | wgpu::TextureUsages::SAMPLED,
                     });
                     let tex_view = texture.create_view(&wgpu::TextureViewDescriptor {
                         label: Some("Framebuffer Texture view"),
@@ -298,7 +299,7 @@ impl Framebuffer {
                     sample_count: self.sample_count,
                     dimension: wgpu::TextureDimension::D2,
                     format: attachment.color_format,
-                    usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 });
                 let msaa_view =
                     Some(msaa_texture.create_view(&wgpu::TextureViewDescriptor::default()));
@@ -330,7 +331,7 @@ impl Framebuffer {
                         sample_count: self.sample_count,
                         dimension: wgpu::TextureDimension::D2,
                         format: depth_format,
-                        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                         label: Some("wgpu-util depth texture"),
                     })
                     .create_view(&wgpu::TextureViewDescriptor::default()),
