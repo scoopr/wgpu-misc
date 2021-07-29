@@ -270,7 +270,8 @@ impl Framebuffer {
                         dimension: wgpu::TextureDimension::D2,
                         format: attachment.color_format,
                         usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                            | wgpu::TextureUsages::SAMPLED,
+                            | wgpu::TextureUsages::TEXTURE_BINDING
+                            | wgpu::TextureUsages::STORAGE_BINDING,
                     });
                     let tex_view = texture.create_view(&wgpu::TextureViewDescriptor {
                         label: Some("Framebuffer Texture view"),
