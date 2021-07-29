@@ -252,7 +252,7 @@ impl Framebuffer {
                     };
 
                     *frame = None; // SwapChainFrame must be dropped debug creating creating new swapchain
-                    let new_swap_chain = device.create_swap_chain(&surface, &sc_desc);
+                    let new_swap_chain = device.create_swap_chain(surface, &sc_desc);
                     *swap_chain = Some(new_swap_chain);
                 }
                 ColorAttachmentData::Texture {
