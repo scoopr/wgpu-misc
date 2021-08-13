@@ -16,8 +16,7 @@ struct ColorAttachmentConfigured {
 enum ColorAttachmentData {
     Surface {
         surface: wgpu::Surface,
-        swap_chain: Option<wgpu::SwapChain>,
-        frame: Option<wgpu::SwapChainFrame>,
+        frame: Option<wgpu::SurfaceTexture>,
     },
     Texture {
         color_texture: Option<wgpu::Texture>,
@@ -32,7 +31,7 @@ pub struct Framebuffer {
     depth_stencil_format: Option<wgpu::TextureFormat>,
     depth_stencil_view: Option<wgpu::TextureView>,
 
-    live_frame: Vec<wgpu::SwapChainFrame>,
+    live_frame: Vec<wgpu::TextureView>,
     present_mode: wgpu::PresentMode,
 
     dirty: bool,
@@ -118,7 +117,6 @@ impl Framebuffer {
         self.color_attachments.push(ColorAttachment {
             data: ColorAttachmentData::Surface {
                 surface,
-                swap_chain: None,
                 frame: None,
             },
             color_format,
@@ -240,20 +238,17 @@ impl Framebuffer {
             match attachment.data {
                 ColorAttachmentData::Surface {
                     ref mut surface,
-                    ref mut swap_chain,
                     ref mut frame,
                 } => {
-                    let sc_desc = wgpu::SwapChainDescriptor {
+                    let config = wgpu::SurfaceConfiguration {
                         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                         format: attachment.color_format,
                         width: self.resolution.0,
                         height: self.resolution.1,
                         present_mode: self.present_mode,
                     };
-
-                    *frame = None; // SwapChainFrame must be dropped debug creating creating new swapchain
-                    let new_swap_chain = device.create_swap_chain(surface, &sc_desc);
-                    *swap_chain = Some(new_swap_chain);
+                    *frame = None;
+                    surface.configure(device, &config);
                 }
                 ColorAttachmentData::Texture {
                     ref mut color_texture,
@@ -374,15 +369,13 @@ impl Framebuffer {
         // so that we can mutate self to store them, when the
         // renderpass borrows it
         for attachment in &self.color_attachments {
-            if let ColorAttachmentData::Surface { swap_chain, .. } = &attachment.data {
-                let swap_chain = swap_chain.as_ref().expect(
-                "swap chain is missing, did you remember to call `resize` before `begin_render_pass`",
-            );
-                let new_frame = swap_chain
+            if let ColorAttachmentData::Surface { surface, .. } = &attachment.data {
+                let new_frame = surface
                     .get_current_frame()
                     .expect("Timeout when acquiring next swap chain texture");
+                let frame_view = new_frame.output.texture.create_view(&Default::default());
 
-                self.live_frame.push(new_frame);
+                self.live_frame.push(frame_view);
             }
         }
 
@@ -393,8 +386,7 @@ impl Framebuffer {
             let resolve_view;
             match &attachment.data {
                 ColorAttachmentData::Surface { .. } => {
-                    let frame_view = &self.live_frame.get(swapchain_idx).unwrap().output.view;
-
+                    let frame_view = self.live_frame.get(swapchain_idx).unwrap();
                     let configured = attachment
                         .configured
                         .as_ref()
