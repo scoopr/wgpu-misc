@@ -22,6 +22,13 @@ enum ColorAttachmentData {
         color_texture: Option<wgpu::Texture>,
     },
 }
+
+#[derive(Debug)]
+struct LiveFrame {
+    view: wgpu::TextureView,
+    frame: wgpu::SurfaceFrame,
+}
+
 #[derive(Debug)]
 pub struct Framebuffer {
     resolution: (u32, u32),
@@ -31,7 +38,7 @@ pub struct Framebuffer {
     depth_stencil_format: Option<wgpu::TextureFormat>,
     depth_stencil_view: Option<wgpu::TextureView>,
 
-    live_frame: Vec<wgpu::TextureView>,
+    live_frame: Vec<LiveFrame>,
     present_mode: wgpu::PresentMode,
 
     dirty: bool,
@@ -375,7 +382,10 @@ impl Framebuffer {
                     .expect("Timeout when acquiring next swap chain texture");
                 let frame_view = new_frame.output.texture.create_view(&Default::default());
 
-                self.live_frame.push(frame_view);
+                self.live_frame.push(LiveFrame {
+                    frame: new_frame,
+                    view: frame_view,
+                });
             }
         }
 
@@ -386,7 +396,7 @@ impl Framebuffer {
             let resolve_view;
             match &attachment.data {
                 ColorAttachmentData::Surface { .. } => {
-                    let frame_view = self.live_frame.get(swapchain_idx).unwrap();
+                    let frame_view = &self.live_frame.get(swapchain_idx).unwrap().view;
                     let configured = attachment
                         .configured
                         .as_ref()
