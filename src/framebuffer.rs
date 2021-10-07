@@ -26,7 +26,7 @@ enum ColorAttachmentData {
 #[derive(Debug)]
 struct LiveFrame {
     view: wgpu::TextureView,
-    frame: wgpu::SurfaceFrame,
+    frame: wgpu::SurfaceTexture,
 }
 
 #[derive(Debug)]
@@ -365,8 +365,10 @@ impl Framebuffer {
     pub fn present(&mut self) {
         debug_assert!(self.needs_present());
 
-        // wgpu currently present on Drop
-        self.live_frame.clear();
+        for f in self.live_frame.drain(..)
+        {
+            f.frame.present();
+        }
     }
 
     /// Begins a render pass
@@ -390,9 +392,9 @@ impl Framebuffer {
         for attachment in &self.color_attachments {
             if let ColorAttachmentData::Surface { surface, .. } = &attachment.data {
                 let new_frame = surface
-                    .get_current_frame()
+                    .get_current_texture()
                     .expect("Timeout when acquiring next swap chain texture");
-                let frame_view = new_frame.output.texture.create_view(&Default::default());
+                let frame_view = new_frame.texture.create_view(&Default::default());
 
                 self.live_frame.push(LiveFrame {
                     frame: new_frame,

@@ -3,7 +3,8 @@ async fn app() {
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::LowPower,
-            compatible_surface: None, //Some(&surface),
+            compatible_surface: None,
+            force_fallback_adapter: false, //Some(&surface),
         })
         .await
         .unwrap();
