@@ -41,6 +41,9 @@ pub struct Framebuffer {
     live_frame: Vec<LiveFrame>,
     present_mode: wgpu::PresentMode,
 
+    depth_store: bool,
+    depth_load_op: wgpu::LoadOp<f32>,
+
     dirty: bool,
 }
 
@@ -85,6 +88,8 @@ impl Framebuffer {
             depth_stencil_format: None,
             present_mode: wgpu::PresentMode::Mailbox,
             dirty: true,
+            depth_store: false,
+            depth_load_op: wgpu::LoadOp::Clear(1.0)
         }
     }
 
@@ -202,6 +207,13 @@ impl Framebuffer {
         self.resolution = (width, height);
         self.dirty = true;
         self.invalidate_resources();
+    }
+
+    pub fn set_depth_store(&mut self, store: bool) {
+        self.depth_store = store;
+    }
+    pub fn set_depth_load_op(&mut self, load_op: wgpu::LoadOp<f32>) {
+        self.depth_load_op = load_op;
     }
 
     pub fn attachment_view(&self, idx: usize) -> Option<&wgpu::TextureView> {
@@ -450,8 +462,8 @@ impl Framebuffer {
                 .map(|tex| wgpu::RenderPassDepthStencilAttachment {
                     view: tex,
                     depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: false,
+                        load: self.depth_load_op,
+                        store: self.depth_store,
                     }),
                     stencil_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(0),
@@ -462,6 +474,32 @@ impl Framebuffer {
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("fb render pass"),
             color_attachments: &color_attachments,
+            depth_stencil_attachment,
+        })
+    }
+
+    pub fn begin_depth_pass<'a>(
+        &'a mut self,
+        encoder: &'a mut wgpu::CommandEncoder,
+    ) -> wgpu::RenderPass<'a> {
+        let depth_stencil_attachment =
+            self.depth_stencil_view
+                .as_ref()
+                .map(|tex| wgpu::RenderPassDepthStencilAttachment {
+                    view: tex,
+                    depth_ops: Some(wgpu::Operations {
+                        load: self.depth_load_op,
+                        store: self.depth_store,
+                    }),
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0),
+                        store: false,
+                    }),
+                });
+
+        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("fb render pass"),
+            color_attachments: &[],
             depth_stencil_attachment,
         })
     }
