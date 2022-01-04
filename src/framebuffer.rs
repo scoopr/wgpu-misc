@@ -8,7 +8,7 @@ struct ColorAttachment {
 
 #[derive(Debug)]
 struct ColorAttachmentConfigured {
-    multisample_texture: Option<wgpu::Texture>,
+    //multisample_texture: Option<wgpu::Texture>,
     attachment_view: Option<wgpu::TextureView>,
     resolve_view: Option<wgpu::TextureView>,
 }
@@ -320,13 +320,13 @@ impl Framebuffer {
                     Some(msaa_texture.create_view(&wgpu::TextureViewDescriptor::default()));
 
                 attachment.configured = Some(ColorAttachmentConfigured {
-                    multisample_texture: Some(msaa_texture),
+                    // multisample_texture: Some(msaa_texture),
                     attachment_view: msaa_view,
                     resolve_view: output_view,
                 });
             } else {
                 attachment.configured = Some(ColorAttachmentConfigured {
-                    multisample_texture: None,
+                    // multisample_texture: None,
                     attachment_view: output_view,
                     resolve_view: None,
                 });
