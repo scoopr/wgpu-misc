@@ -89,7 +89,7 @@ impl Framebuffer {
             present_mode: wgpu::PresentMode::Mailbox,
             dirty: true,
             depth_store: false,
-            depth_load_op: wgpu::LoadOp::Clear(1.0)
+            depth_load_op: wgpu::LoadOp::Clear(1.0),
         }
     }
 
@@ -220,12 +220,7 @@ impl Framebuffer {
         self.color_attachments[idx]
             .configured
             .as_ref()
-            .map(|a| {
-                a.resolve_view
-                    .as_ref()
-                    .or_else(|| a.attachment_view.as_ref())
-            })
-            .flatten()
+            .and_then(|a| a.resolve_view.as_ref().or(a.attachment_view.as_ref()))
     }
 
     pub fn attachment_texture(&self, idx: usize) -> Option<&wgpu::Texture> {
@@ -365,8 +360,7 @@ impl Framebuffer {
     pub fn present(&mut self) {
         debug_assert!(self.needs_present());
 
-        for f in self.live_frame.drain(..)
-        {
+        for f in self.live_frame.drain(..) {
             f.frame.present();
         }
     }

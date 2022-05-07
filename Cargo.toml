@@ -12,17 +12,17 @@ async = ["futures-executor", "wasm-bindgen-futures"]
 framebuffer = ["raw-window-handle"]
 
 [dev-dependencies]
-winit = "0.26.0"
+winit = "0.26.1"
 env_logger = "0.9.0"
 
 [dependencies]
 wgpu = "0.12.0"
-raw-window-handle = { version = "0.4.2", optional = true }
+raw-window-handle = { version = "0.4.3", optional = true }
 
 # Native deps
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-futures-executor = { version = "0.3.19", optional = true }
+futures-executor = { version = "0.3.21", optional = true }
 
 # Wasm deps
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = { version = "0.4.28", optional = true }
+wasm-bindgen-futures = { version = "0.4.30", optional = true }
