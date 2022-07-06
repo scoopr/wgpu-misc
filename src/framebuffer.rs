@@ -86,7 +86,7 @@ impl Framebuffer {
             sample_count: 1,
             resolution: (0, 0),
             depth_stencil_format: None,
-            present_mode: wgpu::PresentMode::Mailbox,
+            present_mode: wgpu::PresentMode::AutoVsync,
             dirty: true,
             depth_store: false,
             depth_load_op: wgpu::LoadOp::Clear(1.0),
@@ -437,7 +437,7 @@ impl Framebuffer {
                 }
             }
 
-            color_attachments.push(wgpu::RenderPassColorAttachment {
+            color_attachments.push(Some(wgpu::RenderPassColorAttachment {
                 view: attachment_view,
                 resolve_target: resolve_view,
                 ops: wgpu::Operations {
@@ -449,7 +449,7 @@ impl Framebuffer {
                     }),
                     store: resolve_view.is_none(),
                 },
-            });
+            }));
         }
 
         let depth_stencil_attachment =
