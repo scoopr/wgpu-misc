@@ -94,12 +94,14 @@ impl Framebuffer {
     }
 
     /// Creates a new Framebuffer that renders to the surface of a window
-    pub fn new_from_window<W: raw_window_handle::HasRawWindowHandle>(
+    pub fn new_from_window<
+        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+    >(
         instance: &wgpu::Instance,
         window: &W,
         color_format: wgpu::TextureFormat,
     ) -> Framebuffer {
-        let surface = unsafe { instance.create_surface(window) };
+        let surface = unsafe { instance.create_surface(window) }.expect("Surface creation");
         Self::new_from_surface(surface, color_format)
     }
 
@@ -260,6 +262,8 @@ impl Framebuffer {
                         width: self.resolution.0,
                         height: self.resolution.1,
                         present_mode: self.present_mode,
+                        alpha_mode: wgpu::CompositeAlphaMode::Auto,
+                        view_formats: vec![],
                     };
                     *frame = None;
                     surface.configure(device, &config);
@@ -281,6 +285,7 @@ impl Framebuffer {
                         usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                             | wgpu::TextureUsages::TEXTURE_BINDING
                             | wgpu::TextureUsages::STORAGE_BINDING,
+                        view_formats: &[],
                     });
                     let tex_view = texture.create_view(&wgpu::TextureViewDescriptor {
                         label: Some("Framebuffer Texture view"),
@@ -310,6 +315,7 @@ impl Framebuffer {
                     dimension: wgpu::TextureDimension::D2,
                     format: attachment.color_format,
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    view_formats: &[],
                 });
                 let msaa_view =
                     Some(msaa_texture.create_view(&wgpu::TextureViewDescriptor::default()));
@@ -343,6 +349,7 @@ impl Framebuffer {
                         format: depth_format,
                         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                         label: Some("wgpu-util depth texture"),
+                        view_formats: &[],
                     })
                     .create_view(&wgpu::TextureViewDescriptor::default()),
             );
