@@ -41,7 +41,7 @@ pub struct Framebuffer {
     live_frame: Vec<LiveFrame>,
     present_mode: wgpu::PresentMode,
 
-    depth_store: bool,
+    depth_store: wgpu::StoreOp,
     depth_load_op: wgpu::LoadOp<f32>,
 
     dirty: bool,
@@ -88,7 +88,7 @@ impl Framebuffer {
             depth_stencil_format: None,
             present_mode: wgpu::PresentMode::AutoVsync,
             dirty: true,
-            depth_store: false,
+            depth_store: wgpu::StoreOp::Discard,
             depth_load_op: wgpu::LoadOp::Clear(1.0),
         }
     }
@@ -212,7 +212,11 @@ impl Framebuffer {
     }
 
     pub fn set_depth_store(&mut self, store: bool) {
-        self.depth_store = store;
+        self.depth_store = if store {
+            wgpu::StoreOp::Store
+        } else {
+            wgpu::StoreOp::Discard
+        };
     }
     pub fn set_depth_load_op(&mut self, load_op: wgpu::LoadOp<f32>) {
         self.depth_load_op = load_op;
@@ -454,7 +458,11 @@ impl Framebuffer {
                         b: attachment.clear_color[2],
                         a: attachment.clear_color[3],
                     }),
-                    store: resolve_view.is_none(),
+                    store: if resolve_view.is_none() {
+                        wgpu::StoreOp::Discard
+                    } else {
+                        wgpu::StoreOp::Store
+                    },
                 },
             }));
         }
@@ -470,7 +478,7 @@ impl Framebuffer {
                     }),
                     stencil_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(0),
-                        store: false,
+                        store: wgpu::StoreOp::Discard,
                     }),
                 });
 
@@ -478,6 +486,8 @@ impl Framebuffer {
             label: Some("fb render pass"),
             color_attachments: &color_attachments,
             depth_stencil_attachment,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         })
     }
 
@@ -496,7 +506,7 @@ impl Framebuffer {
                     }),
                     stencil_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(0),
-                        store: false,
+                        store: wgpu::StoreOp::Discard,
                     }),
                 });
 
@@ -504,6 +514,8 @@ impl Framebuffer {
             label: Some("fb render pass"),
             color_attachments: &[],
             depth_stencil_attachment,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         })
     }
 

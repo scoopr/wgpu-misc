@@ -1,7 +1,6 @@
 use winit::{
     self,
     event::{self, Event, WindowEvent},
-    event_loop,
 };
 
 fn frame(device: &wgpu::Device, framebuffer: &mut wgpu_misc::Framebuffer) -> wgpu::CommandBuffer {
@@ -38,7 +37,7 @@ async fn app() {
         .await
         .unwrap();
     let builder = winit::window::WindowBuilder::new();
-    let event_loop = winit::event_loop::EventLoop::new();
+    let event_loop = winit::event_loop::EventLoop::new().expect("Event loop");
     let window = builder.with_visible(false).build(&event_loop).unwrap();
 
     let mut framebuffer = wgpu_misc::Framebuffer::new_from_window(
@@ -69,15 +68,9 @@ async fn app() {
     framebuffer.present();
     window.set_visible(true);
 
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::MainEventsCleared => {
+    let _s = event_loop.run(move |event, elwt| match event {
+        Event::AboutToWait => {
             window.request_redraw();
-        }
-        Event::RedrawRequested(_) => {
-            let cmd_buf = frame(&device, &mut framebuffer);
-
-            queue.submit(Some(cmd_buf));
-            framebuffer.present();
         }
         Event::WindowEvent {
             event: WindowEvent::Resized(size),
@@ -87,17 +80,23 @@ async fn app() {
             framebuffer.configure(&device);
         }
         Event::WindowEvent { event, .. } => match event {
+            WindowEvent::RedrawRequested => {
+                let cmd_buf = frame(&device, &mut framebuffer);
+
+                queue.submit(Some(cmd_buf));
+                framebuffer.present();
+            }
             WindowEvent::KeyboardInput {
-                input:
-                    event::KeyboardInput {
-                        virtual_keycode: Some(event::VirtualKeyCode::Escape),
+                event:
+                    event::KeyEvent {
+                        logical_key: winit::keyboard::Key::Named(winit::keyboard::NamedKey::Escape),
                         state: event::ElementState::Pressed,
                         ..
                     },
                 ..
             }
             | event::WindowEvent::CloseRequested => {
-                *control_flow = event_loop::ControlFlow::Exit;
+                elwt.exit();
             }
             _ => {}
         },
