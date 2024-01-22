@@ -15,7 +15,7 @@ struct ColorAttachmentConfigured {
 #[derive(Debug)]
 enum ColorAttachmentData {
     Surface {
-        surface: wgpu::Surface,
+        surface: wgpu::Surface<'static>,
         frame: Option<wgpu::SurfaceTexture>,
     },
     Texture {
@@ -95,19 +95,19 @@ impl Framebuffer {
 
     /// Creates a new Framebuffer that renders to the surface of a window
     pub fn new_from_window<
-        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+        W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle + wgpu::WasmNotSendSync + 'static,
     >(
         instance: &wgpu::Instance,
-        window: &W,
+        window: std::sync::Arc<W>,
         color_format: wgpu::TextureFormat,
     ) -> Framebuffer {
-        let surface = unsafe { instance.create_surface(window) }.expect("Surface creation");
+        let surface = instance.create_surface(window).expect("Surface creation");
         Self::new_from_surface(surface, color_format)
     }
 
     /// Create a new Framebuffer that renders to a surface
     pub fn new_from_surface(
-        surface: wgpu::Surface,
+        surface: wgpu::Surface<'static>,
         color_format: wgpu::TextureFormat,
     ) -> Framebuffer {
         let mut fb = Framebuffer::new();
@@ -125,7 +125,7 @@ impl Framebuffer {
     /// Adds a color attachment that renders to a surface
     pub fn add_surface_attachment(
         &mut self,
-        surface: wgpu::Surface,
+        surface: wgpu::Surface<'static>,
         color_format: wgpu::TextureFormat,
     ) {
         self.color_attachments.push(ColorAttachment {
@@ -268,6 +268,7 @@ impl Framebuffer {
                         present_mode: self.present_mode,
                         alpha_mode: wgpu::CompositeAlphaMode::Auto,
                         view_formats: vec![],
+                        desired_maximum_frame_latency: 2,
                     };
                     *frame = None;
                     surface.configure(device, &config);

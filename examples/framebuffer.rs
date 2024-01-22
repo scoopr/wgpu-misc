@@ -29,8 +29,8 @@ async fn app() {
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("device"),
-                features: wgpu::Features::empty(),
-                limits: wgpu::Limits::default(),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
             },
             None,
         )
@@ -38,11 +38,11 @@ async fn app() {
         .unwrap();
     let builder = winit::window::WindowBuilder::new();
     let event_loop = winit::event_loop::EventLoop::new().expect("Event loop");
-    let window = builder.with_visible(false).build(&event_loop).unwrap();
+    let window = std::sync::Arc::new(builder.with_visible(false).build(&event_loop).unwrap());
 
     let mut framebuffer = wgpu_misc::Framebuffer::new_from_window(
         &instance,
-        &window,
+        window.clone(),
         wgpu::TextureFormat::Bgra8UnormSrgb,
     );
 
