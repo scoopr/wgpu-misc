@@ -31,6 +31,7 @@ async fn app() {
                 label: Some("device"),
                 required_features: wgpu::Features::empty(),
                 required_limits: wgpu::Limits::default(),
+                memory_hints: wgpu::MemoryHints::default(),
             },
             None,
         )

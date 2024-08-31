@@ -16,7 +16,7 @@ winit = { version="0.29.10", features = ["rwh_06"], default-features = false }
 env_logger = "0.11.0"
 
 [dependencies]
-wgpu = "0.19.1"
+wgpu = "22.1.0"
 #wgpu = { path="../../ext/wgpu/wgpu" }
 raw-window-handle = { version = "0.6", optional = true }
 
@@ -26,4 +26,4 @@ futures-executor = { version = "0.3.30", optional = true }
 
 # Wasm deps
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = { version = "0.4.40", optional = true }
+wasm-bindgen-futures = { version = "0.4.43", optional = true }
