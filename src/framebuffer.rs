@@ -94,9 +94,7 @@ impl Framebuffer {
     }
 
     /// Creates a new Framebuffer that renders to the surface of a window
-    pub fn new_from_window<
-        W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle + wgpu::WasmNotSendSync + 'static,
-    >(
+    pub fn new_from_window<W: wgpu::WindowHandle + 'static>(
         instance: &wgpu::Instance,
         window: std::sync::Arc<W>,
         color_format: wgpu::TextureFormat,
