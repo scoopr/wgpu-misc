@@ -14,56 +14,52 @@ fn frame(device: &wgpu::Device, framebuffer: &mut wgpu_misc::Framebuffer) -> wgp
 struct Example {
     window: std::sync::Arc<winit::window::Window>,
     framebuffer: wgpu_misc::Framebuffer,
-    adapter_device: AdapterDevice,
-}
-
-#[allow(dead_code)]
-struct AdapterDevice {
-    instance: wgpu::Instance,
-    adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
 }
 
-impl AdapterDevice {
-    async fn new(
-        instance: wgpu::Instance,
-        adapter_options: &wgpu::RequestAdapterOptions<'_, '_>,
-        device_descriptor: &wgpu::DeviceDescriptor<'_>,
-    ) -> Self {
-        let adapter = instance
-            .request_adapter(adapter_options)
-            .await
-            .expect("Adapter request");
-
-        let (device, queue) = adapter
-            .request_device(device_descriptor, None)
-            .await
-            .expect("Device request");
-
-        Self {
-            instance,
-            adapter,
-            device,
-            queue,
-        }
-    }
-}
-
 impl Example {
-    fn new(event_loop: &winit::event_loop::ActiveEventLoop, ad: AdapterDevice) -> Self {
+    fn new(event_loop: &winit::event_loop::ActiveEventLoop) -> Self {
         let window_attributes = winit::window::WindowAttributes::default().with_visible(false);
         let window = std::sync::Arc::new(event_loop.create_window(window_attributes).unwrap());
 
+        let (instance, device, queue) = wgpu_misc::block_on(async move {
+            let instance = wgpu::Instance::new(Default::default());
+
+            let adapter = instance
+                .request_adapter(&wgpu::RequestAdapterOptions {
+                    power_preference: wgpu::PowerPreference::LowPower,
+                    compatible_surface: None,
+                    force_fallback_adapter: false, //Some(&surface),
+                })
+                .await
+                .expect("Adapter request");
+
+            let (device, queue) = adapter
+                .request_device(
+                    &wgpu::DeviceDescriptor {
+                        label: Some("device"),
+                        required_features: wgpu::Features::empty(),
+                        required_limits: wgpu::Limits::default(),
+                        memory_hints: wgpu::MemoryHints::default(),
+                    },
+                    None,
+                )
+                .await
+                .expect("Device request");
+
+            (instance, device, queue)
+        });
+
         let mut framebuffer = wgpu_misc::Framebuffer::new_from_window(
-            &ad.instance,
+            &instance,
             window.clone(),
             wgpu::TextureFormat::Bgra8UnormSrgb,
         );
         let sz = window.inner_size();
         framebuffer.set_resolution(sz.width, sz.height);
         framebuffer.set_depth_stencil_format(Some(wgpu::TextureFormat::Depth24Plus));
-        framebuffer.configure(&ad.device);
+        framebuffer.configure(&device);
 
         framebuffer.set_clear_color(&[0.7, 0.3, 0.2, 1.0]);
 
@@ -72,16 +68,17 @@ impl Example {
         // TODO: It seems it is enough to just have a set_visible call, as
         // long as it was created as hidden, but need to check other platforms
         // (tested on osx)
-        let cmd_buf = frame(&ad.device, &mut framebuffer);
+        let cmd_buf = frame(&device, &mut framebuffer);
 
-        ad.queue.submit(Some(cmd_buf));
+        queue.submit(Some(cmd_buf));
         framebuffer.present();
         window.set_visible(true);
 
         Self {
             window,
             framebuffer,
-            adapter_device: ad,
+            device,
+            queue,
         }
     }
 }
@@ -93,26 +90,7 @@ struct ExampleApp {
 impl winit::application::ApplicationHandler for ExampleApp {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         if self.example.is_none() {
-            let ad = wgpu_misc::block_on(async move {
-                let instance = wgpu::Instance::new(Default::default());
-
-                AdapterDevice::new(
-                    instance,
-                    &wgpu::RequestAdapterOptions {
-                        power_preference: wgpu::PowerPreference::LowPower,
-                        compatible_surface: None,
-                        force_fallback_adapter: false, //Some(&surface),
-                    },
-                    &wgpu::DeviceDescriptor {
-                        label: Some("device"),
-                        required_features: wgpu::Features::empty(),
-                        required_limits: wgpu::Limits::default(),
-                        memory_hints: wgpu::MemoryHints::default(),
-                    },
-                )
-                .await
-            });
-            self.example = Some(Example::new(event_loop, ad));
+            self.example = Some(Example::new(event_loop));
         }
     }
 
@@ -128,14 +106,12 @@ impl winit::application::ApplicationHandler for ExampleApp {
         match event {
             WindowEvent::Resized(size) => {
                 example.framebuffer.set_resolution(size.width, size.height);
-                example
-                    .framebuffer
-                    .configure(&example.adapter_device.device);
+                example.framebuffer.configure(&example.device);
             }
             WindowEvent::RedrawRequested => {
-                let cmd_buf = frame(&example.adapter_device.device, &mut example.framebuffer);
+                let cmd_buf = frame(&example.device, &mut example.framebuffer);
 
-                example.adapter_device.queue.submit(Some(cmd_buf));
+                example.queue.submit(Some(cmd_buf));
                 example.framebuffer.present();
             }
             WindowEvent::KeyboardInput {
