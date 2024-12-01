@@ -22,14 +22,15 @@ impl Example {
     fn new(event_loop: &winit::event_loop::ActiveEventLoop) -> Self {
         let window_attributes = winit::window::WindowAttributes::default().with_visible(false);
         let window = std::sync::Arc::new(event_loop.create_window(window_attributes).unwrap());
-
-        let (instance, device, queue) = wgpu_misc::block_on(async move {
+        let window2 = window.clone(); // moved to async block
+        let (device, queue, surface) = wgpu_misc::block_on(async move {
             let instance = wgpu::Instance::new(Default::default());
+            let surface = instance.create_surface(window2).expect("surface");
 
             let adapter = instance
                 .request_adapter(&wgpu::RequestAdapterOptions {
                     power_preference: wgpu::PowerPreference::LowPower,
-                    compatible_surface: None,
+                    compatible_surface: Some(&surface),
                     force_fallback_adapter: false, //Some(&surface),
                 })
                 .await
@@ -48,14 +49,11 @@ impl Example {
                 .await
                 .expect("Device request");
 
-            (instance, device, queue)
+            (device, queue, surface)
         });
 
-        let mut framebuffer = wgpu_misc::Framebuffer::new_from_window(
-            &instance,
-            window.clone(),
-            wgpu::TextureFormat::Bgra8UnormSrgb,
-        );
+        let mut framebuffer =
+            wgpu_misc::Framebuffer::new_from_surface(surface, wgpu::TextureFormat::Bgra8UnormSrgb);
         let sz = window.inner_size();
         framebuffer.set_resolution(sz.width, sz.height);
         framebuffer.set_depth_stencil_format(Some(wgpu::TextureFormat::Depth24Plus));
