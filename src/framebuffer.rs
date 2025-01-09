@@ -458,9 +458,9 @@ impl Framebuffer {
                         a: attachment.clear_color[3],
                     }),
                     store: if resolve_view.is_none() {
-                        wgpu::StoreOp::Discard
-                    } else {
                         wgpu::StoreOp::Store
+                    } else {
+                        wgpu::StoreOp::Discard
                     },
                 },
             }));
