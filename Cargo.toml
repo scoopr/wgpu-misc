@@ -16,7 +16,7 @@ winit = { version = "0.30.5", features = ["rwh_06"], default-features = false }
 env_logger = "0.11.5"
 
 [dependencies]
-wgpu = "23.0.0"
+wgpu = "24.0.0"
 #wgpu = { path="../../ext/wgpu/wgpu" }
 raw-window-handle = { version = "0.6", optional = true }
 

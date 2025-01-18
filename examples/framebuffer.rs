@@ -24,7 +24,7 @@ impl Example {
         let window = std::sync::Arc::new(event_loop.create_window(window_attributes).unwrap());
         let window2 = window.clone(); // moved to async block
         let (device, queue, surface) = wgpu_misc::block_on(async move {
-            let instance = wgpu::Instance::new(Default::default());
+            let instance = wgpu::Instance::new(&Default::default());
             let surface = instance.create_surface(window2).expect("surface");
 
             let adapter = instance

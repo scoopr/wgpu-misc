@@ -73,7 +73,7 @@ pub struct Framebuffer {
 ///
 ///    queue.submit(Some(encoder.finish()));
 ///    framebuffer.present(); // Tells the swapchain that the frame is finished
-///    
+///
 /// ```
 ///
 impl Framebuffer {
@@ -299,6 +299,7 @@ impl Framebuffer {
                         mip_level_count: None,
                         base_array_layer: 0,
                         array_layer_count: None,
+                        usage: None,
                     });
                     output_view = Some(tex_view);
                     *color_texture = Some(texture);
