@@ -37,15 +37,13 @@ impl Example {
                 .expect("Adapter request");
 
             let (device, queue) = adapter
-                .request_device(
-                    &wgpu::DeviceDescriptor {
-                        label: Some("device"),
-                        required_features: wgpu::Features::empty(),
-                        required_limits: wgpu::Limits::default(),
-                        memory_hints: wgpu::MemoryHints::default(),
-                    },
-                    None,
-                )
+                .request_device(&wgpu::DeviceDescriptor {
+                    label: Some("device"),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                    memory_hints: wgpu::MemoryHints::default(),
+                    trace: wgpu::Trace::Off,
+                })
                 .await
                 .expect("Device request");
 
