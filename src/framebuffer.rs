@@ -464,6 +464,7 @@ impl Framebuffer {
                         wgpu::StoreOp::Discard
                     },
                 },
+                depth_slice: None,
             }));
         }
 
