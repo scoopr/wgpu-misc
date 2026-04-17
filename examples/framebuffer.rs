@@ -24,7 +24,8 @@ impl Example {
         let window = std::sync::Arc::new(event_loop.create_window(window_attributes).unwrap());
         let window2 = window.clone(); // moved to async block
         let (device, queue, surface) = wgpu_misc::block_on(async move {
-            let instance = wgpu::Instance::new(&Default::default());
+            let instance =
+                wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
             let surface = instance.create_surface(window2).expect("surface");
 
             let adapter = instance
@@ -68,7 +69,9 @@ impl Example {
         let cmd_buf = frame(&device, &mut framebuffer);
 
         queue.submit(Some(cmd_buf));
-        framebuffer.present();
+        if framebuffer.needs_present() {
+            framebuffer.present();
+        }
         window.set_visible(true);
 
         Self {
@@ -82,12 +85,14 @@ impl Example {
 
 struct ExampleApp {
     example: Option<Example>,
+    keep_drawing: bool,
 }
 
 impl winit::application::ApplicationHandler for ExampleApp {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         if self.example.is_none() {
             self.example = Some(Example::new(event_loop));
+            self.keep_drawing = true;
         }
     }
 
@@ -101,6 +106,9 @@ impl winit::application::ApplicationHandler for ExampleApp {
             return;
         };
         match event {
+            WindowEvent::Occluded(occluded) => {
+                self.keep_drawing = !occluded;
+            }
             WindowEvent::Resized(size) => {
                 example.framebuffer.set_resolution(size.width, size.height);
                 example.framebuffer.configure(&example.device);
@@ -109,7 +117,10 @@ impl winit::application::ApplicationHandler for ExampleApp {
                 let cmd_buf = frame(&example.device, &mut example.framebuffer);
 
                 example.queue.submit(Some(cmd_buf));
-                example.framebuffer.present();
+
+                if example.framebuffer.needs_present() {
+                    example.framebuffer.present();
+                }
             }
             WindowEvent::KeyboardInput {
                 event:
@@ -131,7 +142,9 @@ impl winit::application::ApplicationHandler for ExampleApp {
         let Some(ref mut example) = self.example else {
             return;
         };
-        example.window.request_redraw();
+        if self.keep_drawing {
+            example.window.request_redraw();
+        }
     }
 }
 
@@ -142,7 +155,10 @@ fn main() {
 
     tex_fb.set_clear_color(&[0.2, 0.3, 0.7, 1.0]);
 
-    let mut app = ExampleApp { example: None };
+    let mut app = ExampleApp {
+        example: None,
+        keep_drawing: true,
+    };
 
     event_loop.run_app(&mut app).expect("Event loop run");
 }

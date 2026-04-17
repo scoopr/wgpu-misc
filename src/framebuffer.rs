@@ -38,7 +38,7 @@ pub struct Framebuffer {
     depth_stencil_format: Option<wgpu::TextureFormat>,
     depth_stencil_view: Option<wgpu::TextureView>,
 
-    live_frame: Vec<LiveFrame>,
+    live_frame: Vec<Option<LiveFrame>>,
     present_mode: wgpu::PresentMode,
 
     depth_store: wgpu::StoreOp,
@@ -61,7 +61,8 @@ pub struct Framebuffer {
 ///    # let (device,instance,mut encoder) = unimplemented!();
 ///    # let window_width = 320;
 ///    # let window_height = 200;
-///    let mut framebuffer = wgpu_misc::Framebuffer::new_from_window(&instance, &window, wgpu::TextureFormat::Bgra8UnormSrgb);
+///    # use std::sync::Arc;
+///    let mut framebuffer = wgpu_misc::Framebuffer::new_from_window(&instance, Arc::new(&window), wgpu::TextureFormat::Bgra8UnormSrgb);
 ///    framebuffer.set_resolution(window_width, window_height);
 ///    framebuffer.set_depth_stencil_format(Some(wgpu::TextureFormat::Depth24Plus));
 ///    framebuffer.configure(&device); // Creates the resources, needs to be always called after resource invalidation
@@ -94,7 +95,9 @@ impl Framebuffer {
     }
 
     /// Creates a new Framebuffer that renders to the surface of a window
-    pub fn new_from_window<W: wgpu::WindowHandle + 'static>(
+    pub fn new_from_window<
+        W: wgpu::WindowHandle + 'static + raw_window_handle::HasDisplayHandle,
+    >(
         instance: &wgpu::Instance,
         window: std::sync::Arc<W>,
         color_format: wgpu::TextureFormat,
@@ -371,7 +374,7 @@ impl Framebuffer {
     pub fn present(&mut self) {
         debug_assert!(self.needs_present());
 
-        for f in self.live_frame.drain(..) {
+        for f in self.live_frame.drain(..).flatten() {
             f.frame.present();
         }
     }
@@ -381,7 +384,7 @@ impl Framebuffer {
     pub fn begin_render_pass<'a>(
         &'a mut self,
         encoder: &'a mut wgpu::CommandEncoder,
-    ) -> wgpu::RenderPass<'a> {
+    ) -> Option<wgpu::RenderPass<'a>> {
         // The lifetimes above are telling that the RenderPass must not be
         // dropped before self or encoder, as the RenderPass will refer to
         // values in them
@@ -389,56 +392,94 @@ impl Framebuffer {
         debug_assert!(self.live_frame.is_empty());
         assert!(!self.dirty, "Framebuffer was modified but not reconfigured");
 
-        let mut color_attachments = Vec::new();
+        let mut color_attachments = Vec::with_capacity(self.color_attachment_count());
 
         // Start acquire the swapchain frames in separate loop,
         // so that we can mutate self to store them, when the
         // renderpass borrows it
         for attachment in &self.color_attachments {
             if let ColorAttachmentData::Surface { surface, .. } = &attachment.data {
-                let new_frame = surface
-                    .get_current_texture()
-                    .expect("Timeout when acquiring next swap chain texture");
-                let frame_view = new_frame.texture.create_view(&Default::default());
+                let new_frame = surface.get_current_texture();
+                match new_frame {
+                    wgpu::CurrentSurfaceTexture::Success(surface_texture) => {
+                        let frame_view = surface_texture.texture.create_view(&Default::default());
 
-                self.live_frame.push(LiveFrame {
-                    frame: new_frame,
-                    view: frame_view,
-                });
+                        self.live_frame.push(Some(LiveFrame {
+                            frame: surface_texture,
+                            view: frame_view,
+                        }));
+                    }
+                    wgpu::CurrentSurfaceTexture::Suboptimal(surface_texture) => {
+                        let frame_view = surface_texture.texture.create_view(&Default::default());
+
+                        self.live_frame.push(Some(LiveFrame {
+                            frame: surface_texture,
+                            view: frame_view,
+                        }));
+                    }
+                    wgpu::CurrentSurfaceTexture::Timeout => {
+                        self.live_frame.clear();
+                        return None;
+                    }
+                    wgpu::CurrentSurfaceTexture::Occluded => {
+                        self.live_frame.clear();
+                        return None;
+                    }
+                    wgpu::CurrentSurfaceTexture::Outdated => {
+                        self.live_frame.clear();
+                        return None;
+                    }
+                    wgpu::CurrentSurfaceTexture::Lost => {
+                        self.live_frame.clear();
+                        return None;
+                    }
+                    wgpu::CurrentSurfaceTexture::Validation => {
+                        self.live_frame.clear();
+                        return None;
+                    }
+                }
             }
         }
 
         let mut swapchain_idx = 0;
         // TODO: retain the vec, update only when dirty or surface attachment
         for attachment in &self.color_attachments {
-            let attachment_view;
-            let resolve_view;
+            let mut attachment_view = None;
+            let mut resolve_view = None;
             match &attachment.data {
                 ColorAttachmentData::Surface { .. } => {
-                    let frame_view = &self.live_frame.get(swapchain_idx).unwrap().view;
-                    let configured = attachment
-                        .configured
-                        .as_ref()
-                        .expect("Unconfigured attachment, did you call configure()?");
+                    if let Some(live_frame) = self
+                        .live_frame
+                        .get(swapchain_idx)
+                        .expect("framebuffer: missing live frame")
+                    {
+                        let frame_view = &live_frame.view;
+                        let configured = attachment
+                            .configured
+                            .as_ref()
+                            .expect("Unconfigured attachment, did you call configure()?");
 
-                    if configured.attachment_view.is_some() {
-                        attachment_view = configured.attachment_view.as_ref().unwrap();
-                        resolve_view = Some(frame_view);
-                    } else {
-                        attachment_view = frame_view;
-                        resolve_view = None;
+                        if let Some(attach_view) = &configured.attachment_view {
+                            attachment_view = Some(attach_view);
+                            resolve_view = Some(frame_view);
+                        } else {
+                            attachment_view = Some(frame_view);
+                            resolve_view = None;
+                        }
                     }
 
                     swapchain_idx += 1;
                 }
                 ColorAttachmentData::Texture { color_texture: _ } => {
-                    attachment_view = attachment
-                        .configured
-                        .as_ref()
-                        .unwrap()
-                        .attachment_view
-                        .as_ref()
-                        .unwrap();
+                    attachment_view = Some(
+                        attachment
+                            .configured
+                            .as_ref()
+                            .unwrap()
+                            .attachment_view
+                            .as_ref()
+                            .unwrap(),
+                    );
                     resolve_view = attachment
                         .configured
                         .as_ref()
@@ -448,24 +489,26 @@ impl Framebuffer {
                 }
             }
 
-            color_attachments.push(Some(wgpu::RenderPassColorAttachment {
-                view: attachment_view,
-                resolve_target: resolve_view,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: attachment.clear_color[0],
-                        g: attachment.clear_color[1],
-                        b: attachment.clear_color[2],
-                        a: attachment.clear_color[3],
-                    }),
-                    store: if resolve_view.is_none() {
-                        wgpu::StoreOp::Store
-                    } else {
-                        wgpu::StoreOp::Discard
+            if let Some(attachment_view) = attachment_view {
+                color_attachments.push(Some(wgpu::RenderPassColorAttachment {
+                    view: attachment_view,
+                    resolve_target: resolve_view,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: attachment.clear_color[0],
+                            g: attachment.clear_color[1],
+                            b: attachment.clear_color[2],
+                            a: attachment.clear_color[3],
+                        }),
+                        store: if resolve_view.is_none() {
+                            wgpu::StoreOp::Store
+                        } else {
+                            wgpu::StoreOp::Discard
+                        },
                     },
-                },
-                depth_slice: None,
-            }));
+                    depth_slice: None,
+                }));
+            }
         }
 
         let depth_stencil_attachment =
@@ -483,13 +526,14 @@ impl Framebuffer {
                     }),
                 });
 
-        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        Some(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("fb render pass"),
             color_attachments: &color_attachments,
             depth_stencil_attachment,
             timestamp_writes: None,
             occlusion_query_set: None,
-        })
+            multiview_mask: None,
+        }))
     }
 
     pub fn begin_depth_pass<'a>(
@@ -517,6 +561,7 @@ impl Framebuffer {
             depth_stencil_attachment,
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         })
     }
 
